@@ -26,3 +26,34 @@ pub struct User {
 pub struct AppData {
     pub tx: broadcast::Sender<Message>
 }
+
+#[derive(Deserialize)]
+pub struct HcCallbackParams {
+    pub code: String
+}
+
+#[derive(Serialize)]
+pub struct HcTokenRequest<'a> {
+    pub client_id: &'a str,
+    pub client_secret: &'a str,
+    pub redirect_uri: &'a str,
+    pub code: &'a str,
+    pub grant_type: &'a str,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct HcTokenResponse {
+    pub access_token: String,
+    pub token_type: String,
+    pub id_token: Option<String>,
+}
+
+
+#[derive(Debug, Deserialize)]
+pub struct HcClaims {
+    pub sub: String,
+    pub name: Option<String>,
+    pub given_name: Option<String>,
+    pub family_name: Option<String>,
+    pub email: Option<String>,
+}

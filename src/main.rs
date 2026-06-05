@@ -1,9 +1,10 @@
 use axum::{Router, routing::get};
 use tokio::sync::broadcast;
 use tower_http::services::{ServeFile};
+use tower_sessions::cookie::SameSite;
 use tower_sessions::{MemoryStore, SessionManagerLayer};
 
-use crate::{auth::login_guest, structs::{AppData, Message}};
+use crate::{auth::{hc_auth_redirect, hc_callback, login_guest, root_handler}, structs::{AppData, Message}};
 
 pub mod ws;
 pub mod structs;
@@ -16,16 +17,22 @@ async fn main() -> anyhow::Result<()> {
     let app_state = AppData { tx: tx };
 
     let store = MemoryStore::default();
-    let session_layer = SessionManagerLayer::new(store);
+    let session_layer = SessionManagerLayer::new(store)
+        .with_secure(false)
+        .with_same_site(SameSite::Lax);
 
     let api_router = Router::new()
         .route("/auth/guest", get(login_guest))
+        .route("/auth/hc", get(hc_auth_redirect))
+        .route("/auth/hc/callback", get(hc_callback))
         .route("/ws", get(ws::ws_upg))
+        .route("/", get(root_handler))
         .layer(session_layer)
         .with_state(app_state);
 
     let page_router = Router::new()
-        .nest_service("/chat", ServeFile::new("public/chat.html"));
+        .nest_service("/chat", ServeFile::new("public/chat.html"))
+        .nest_service("/login", ServeFile::new("public/login.html"));
 
     let app = Router::new()
         .merge(api_router)
