@@ -1,22 +1,27 @@
-use std::sync::{Arc, Mutex};
-
 use axum::{Router, routing::get};
-use tower_http::services::{ServeDir, ServeFile};
+use tokio::sync::broadcast;
+use tower_http::services::{ServeFile};
+use tower_sessions::{MemoryStore, SessionManagerLayer};
 
-use crate::structs::AppData;
+use crate::{auth::login_guest, structs::{AppData, Message}};
 
 pub mod ws;
 pub mod structs;
 pub mod message_handler;
+pub mod auth;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let app_state = AppData {
-        sockets: Arc::new(Mutex::new(Vec::new()))
-    };
+    let (tx, _) = broadcast::channel::<Message>(100);
+    let app_state = AppData { tx: tx };
+
+    let store = MemoryStore::default();
+    let session_layer = SessionManagerLayer::new(store);
 
     let api_router = Router::new()
+        .route("/auth/guest", get(login_guest))
         .route("/ws", get(ws::ws_upg))
+        .layer(session_layer)
         .with_state(app_state);
 
     let page_router = Router::new()

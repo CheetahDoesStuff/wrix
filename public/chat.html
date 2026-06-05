@@ -22,8 +22,8 @@
 
         function send_message(text) {
             const payload = {
-                owner: "user",
-                message: text,
+                content_type: "text",
+                content: text,
                 date: Date.now()
             };
             ws.send(JSON.stringify(payload));
