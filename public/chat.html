@@ -6,6 +6,51 @@
     <title>Wrix</title>
 </head>
 <body>
-    Hello world!
+    <div id="messages"></div>
+    <form id="chat-form">
+        <input type="text" id="message-input" placeholder="Type your message here..." required autocomplete="off" />
+        <button type="submit">Send</button>
+    </form>
+    <script>
+
+        const chatForm = document.getElementById('chat-form');
+        const messageInput = document.getElementById('message-input');
+        const messages = document.getElementById("messages");
+
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+        function send_message(text) {
+            const payload = {
+                owner: "user",
+                message: text,
+                date: Date.now()
+            };
+            ws.send(JSON.stringify(payload));
+        }
+
+        ws.onopen = () => {
+            console.log("Connected to websocked successfully!")
+        }
+
+        ws.onmessage = (event) =>  {
+            try {
+                const incomingData = JSON.parse(event.data);
+                messageElement = document.createElement("p");
+                const timeString = new Date(incomingData.date).toLocaleTimeString();
+                messageElement.textContent = `[ ${incomingData.owner} : ${timeString} ] ${incomingData.message}`;
+                messages.appendChild(messageElement);
+                
+            } catch (error) {
+                console.error("Received non-JSON content or mismatched schema:", error)
+            }
+        }
+
+        chatForm.addEventListener("submit", function(event) {
+            event.preventDefault();
+            const textValue = messageInput.value.trim();
+            if (textValue.length > 0) { send_message(textValue); messageInput.value = ""; }
+        });
+    </script>
 </body>
 </html>
