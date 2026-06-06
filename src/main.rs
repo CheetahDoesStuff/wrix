@@ -1,5 +1,8 @@
+use std::sync::{Arc, Mutex};
+
 use axum::middleware;
 use axum::{Router, routing::get};
+use rusqlite::Connection;
 use tokio::sync::broadcast;
 use tower_http::services::{ServeFile};
 use tower_sessions::cookie::SameSite;
@@ -16,7 +19,9 @@ pub mod auth;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let (tx, _) = broadcast::channel::<Message>(100);
-    let app_state = AppData { tx: tx };
+    let app_state = AppData { tx: tx, conn: Arc::new(Mutex::new(Connection::open("data.db").unwrap())) };
+    let _ = app_state.conn.lock().unwrap().execute("CREATE TABLE IF NOT EXISTS users ( id TEXT, username TEXT )", ());
+    let _ = app_state.conn.lock().unwrap().execute("CREATE TABLE IF NOT EXISTS messages ( owner TEXT, date INTEGER, content TEXT )", ());
 
     let store = MemoryStore::default();
     let session_layer = SessionManagerLayer::new(store)

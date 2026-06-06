@@ -1,9 +1,10 @@
-use axum::{extract::{Query, Request}, middleware::Next, response::{IntoResponse, Redirect}};
+use axum::{extract::{Query, Request, State}, middleware::Next, response::{IntoResponse, Redirect}};
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
 use reqwest::Client;
+use rusqlite::OptionalExtension;
 use time::Duration;
 use tower_sessions::{Expiry, Session};
-use crate::structs::{HcCallbackParams, HcClaims, HcTokenRequest, HcTokenResponse, User};
+use crate::structs::{AppData, HcCallbackParams, HcClaims, HcTokenRequest, HcTokenResponse, User};
 use rand::RngExt;
 
 pub async fn root_handler(session: Session) -> Redirect {
@@ -70,8 +71,9 @@ pub async fn hc_auth_redirect(req: Request) -> Redirect {
     Redirect::to(&url)
 }
 
+#[axum::debug_handler]
 pub async fn hc_callback(
-    Query(params): Query<HcCallbackParams>, session: Session
+    State(state): State<AppData>, Query(params): Query<HcCallbackParams>, session: Session
 ) -> Result<Redirect, String> {
     let code = params.code;
     println!("got code: {}", code);
@@ -128,15 +130,37 @@ pub async fn hc_callback(
         &decoding_key,
         &validation,
     ).map_err(|e| e.to_string())?;
-
     let id = format!("hc-{}", claims.claims.slack_id.unwrap_or_else(|| panic!("Failed to retrieve slack id during auth!")));
-    let user = User {
-        id: id,
-        name: gen_acc_name(),
-        authenticated: true,
+
+    let user = {
+        let conn = state.conn.lock().unwrap();
+
+        let existing_user: Option<User> = conn.query_row(
+            "SELECT id, username FROM users WHERE id = ?1",
+            [&id],
+            |row| Ok(User {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                authenticated: true,
+            }),
+        ).optional().map_err(|e| e.to_string())?;
+
+        if let Some(existing) = existing_user {
+            existing
+        } else {
+            let new_user = User {
+                id: id,
+                name: gen_acc_name(),
+                authenticated: true,
+            };
+            conn.execute(
+                "INSERT INTO users (id, username) VALUES (?1, ?2)",
+                (&new_user.id, &new_user.name),
+            ).map_err(|e| e.to_string())?;
+            new_user
+        }
     };
     
-
     session.set_expiry(Some(Expiry::AtDateTime(
         time::OffsetDateTime::now_utc() + Duration::days(30)
     )));

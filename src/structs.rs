@@ -1,3 +1,6 @@
+use std::sync::{Arc, Mutex};
+
+use rusqlite::Connection;
 use tokio::sync::broadcast;
 use serde::{Serialize, Deserialize};
 
@@ -17,7 +20,8 @@ pub struct ReceivedData {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct UsernameResponse {
-    pub username: String
+    pub username: String,
+    pub authenticated: bool
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -34,7 +38,8 @@ pub struct User {
 
 #[derive(Clone)]
 pub struct AppData {
-    pub tx: broadcast::Sender<Message>
+    pub tx: broadcast::Sender<Message>,
+    pub conn: Arc<Mutex<Connection>>
 }
 
 #[derive(Deserialize)]

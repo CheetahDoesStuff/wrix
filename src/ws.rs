@@ -41,7 +41,7 @@ async fn handle_socket(socket: WebSocket, state: AppData, session: Session) {
         }
     });
 
-    let username_information = UsernameResponse { username: user.name.clone() };
+    let username_information = UsernameResponse { username: user.name.clone(), authenticated: user.authenticated };
     if let Ok(json) = serde_json::to_string(&username_information) {
         let _ = local_tx.send(WsMessage::Text(json.into())).await;
     }    
@@ -52,9 +52,11 @@ async fn handle_socket(socket: WebSocket, state: AppData, session: Session) {
                 Ok(ClientMessage::Message(incoming)) => {
                     let _ = state.tx.send(Message {
                         owner: user.name.clone(),
-                        message: incoming.content,
+                        message: incoming.content.clone(),
                         date: incoming.date,
                     });
+
+                    let _ = state.conn.lock().unwrap().execute("INSERT INTO messages (owner, date, content) VALUES (?1, ?2, ?3)", (user.name.clone(), incoming.date, incoming.content));
                 }
 
                 Ok(ClientMessage::UsernameRequest(request)) => {
@@ -67,7 +69,7 @@ async fn handle_socket(socket: WebSocket, state: AppData, session: Session) {
                         )));
                         session.insert("userdata", &user).await.unwrap();
                         
-                        let response = UsernameResponse { username: user.name.clone() };
+                        let response = UsernameResponse { username: user.name.clone(), authenticated: user.authenticated };
                         if let Ok(json) = serde_json::to_string(&response) {
                             let _ = local_tx.send(WsMessage::Text(json.into())).await;
                         }
@@ -77,6 +79,13 @@ async fn handle_socket(socket: WebSocket, state: AppData, session: Session) {
                             message: format!("User '{}' changed their username to '{}'", old_name, user.name),
                             date: 0
                         });
+
+                        state.conn.lock().unwrap().execute("UPDATE users SET username = ?1 WHERE id = ?2", (user.name.clone(), user.id.clone()));
+                    } else {
+                        let response = UsernameResponse { username: user.name.clone(), authenticated: user.authenticated };
+                        if let Ok(json) = serde_json::to_string(&response) {
+                            let _ = local_tx.send(WsMessage::Text(json.into())).await;
+                        }
                     }
                 }
 

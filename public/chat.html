@@ -7,7 +7,7 @@
 </head>
 <body>
     <form id="name-form">
-        <input type="text" id="name-input" placeholder="Username" required autocomplete="off" />
+        <input type="text" id="name-input" placeholder="Username" required autocomplete="off" disabled/>
         <button type="submit">Set</button>
     </form>
     <div id="messages"></div>
@@ -55,6 +55,8 @@
             
                 } else if ("username" in incomingData) {
                     nameInput.value = incomingData.username
+                    if (incomingData.authenticated) { nameInput.disabled = false; nameInput.title = "You must log in to change your unsername!"; }
+                    else { nameInput.disabled = true; }
                 } else {
                     console.warn("Unknown packet recieved!");
                 }
