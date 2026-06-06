@@ -44,7 +44,32 @@ async fn handle_socket(socket: WebSocket, state: AppData, session: Session) {
     let username_information = UsernameResponse { username: user.name.clone(), authenticated: user.authenticated };
     if let Ok(json) = serde_json::to_string(&username_information) {
         let _ = local_tx.send(WsMessage::Text(json.into())).await;
-    }    
+    }   
+
+    let mut messages = {
+        let conn = state.conn.lock().unwrap();
+
+        let mut stmt = conn.prepare(
+            "SELECT owner, date, content
+            FROM messages
+            ORDER BY date DESC
+            LIMIT 50"
+        ).unwrap();
+
+        let rows = stmt.query_map([], |row| {
+            Ok(Message {
+                owner: row.get(0)?,
+                date: row.get(1)?,
+                message: row.get(2)?,
+            })
+        }).unwrap();
+
+        rows.map(|r| r.unwrap()).collect::<Vec<_>>()
+    };
+    messages.reverse();
+    for message in messages {
+        let _ = state.tx.send(message);
+    }
 
     while let Some(Ok(msg)) = stream.next().await {
         if let WsMessage::Text(text) = msg {
@@ -80,7 +105,7 @@ async fn handle_socket(socket: WebSocket, state: AppData, session: Session) {
                             date: 0
                         });
 
-                        state.conn.lock().unwrap().execute("UPDATE users SET username = ?1 WHERE id = ?2", (user.name.clone(), user.id.clone()));
+                        let _ = state.conn.lock().unwrap().execute("UPDATE users SET username = ?1 WHERE id = ?2", (user.name.clone(), user.id.clone()));
                     } else {
                         let response = UsernameResponse { username: user.name.clone(), authenticated: user.authenticated };
                         if let Ok(json) = serde_json::to_string(&response) {
