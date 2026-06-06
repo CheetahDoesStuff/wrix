@@ -6,16 +6,22 @@
     <title>Wrix</title>
 </head>
 <body>
+    <form id="name-form">
+        <input type="text" id="name-input" placeholder="Username" required autocomplete="off" />
+        <button type="submit">Set</button>
+    </form>
     <div id="messages"></div>
     <form id="chat-form">
         <input type="text" id="message-input" placeholder="Type your message here..." required autocomplete="off" />
         <button type="submit">Send</button>
     </form>
     <script>
-
         const chatForm = document.getElementById('chat-form');
         const messageInput = document.getElementById('message-input');
         const messages = document.getElementById("messages");
+
+        const nameForm = document.getElementById("name-form");
+        const nameInput = document.getElementById("name-input");
 
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
         const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
@@ -36,13 +42,25 @@
         ws.onmessage = (event) =>  {
             try {
                 const incomingData = JSON.parse(event.data);
-                messageElement = document.createElement("p");
-                const timeString = new Date(incomingData.date).toLocaleTimeString();
-                messageElement.textContent = `[ ${incomingData.owner} : ${timeString} ] ${incomingData.message}`;
-                messages.appendChild(messageElement);
+                if ("message" in incomingData && "owner" in incomingData) {
+                    messageElement = document.createElement("p");
+                    if (incomingData.owner == "SERVER_MESSAGE" && incomingData.date == 0) {
+                        messageElement.textContent = `${incomingData.message}`
+                        messages.appendChild(messageElement);
+                    } else {
+                        const timeString = new Date(incomingData.date).toLocaleTimeString();
+                        messageElement.textContent = `[ ${timeString} ] ${incomingData.owner}:  ${incomingData.message}`;
+                        messages.appendChild(messageElement);
+                    }
+            
+                } else if ("username" in incomingData) {
+                    nameInput.value = incomingData.username
+                } else {
+                    console.warn("Unknown packet recieved!");
+                }
                 
             } catch (error) {
-                console.error("Received non-JSON content or mismatched schema:", error)
+                console.error("Received non-JSON contenta or mismatched schema:", error)
             }
         }
 
@@ -50,6 +68,14 @@
             event.preventDefault();
             const textValue = messageInput.value.trim();
             if (textValue.length > 0) { send_message(textValue); messageInput.value = ""; }
+        });
+
+        nameForm.addEventListener("submit", (event) => {
+            event.preventDefault();
+
+            ws.send(JSON.stringify({
+                username: nameInput.value.trim()
+            }));
         });
     </script>
 </body>

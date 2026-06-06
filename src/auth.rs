@@ -1,4 +1,4 @@
-use axum::{extract::{Query, Request}, response::Redirect};
+use axum::{extract::{Query, Request}, middleware::Next, response::{IntoResponse, Redirect}};
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
 use reqwest::Client;
 use time::Duration;
@@ -7,13 +7,37 @@ use crate::structs::{HcCallbackParams, HcClaims, HcTokenRequest, HcTokenResponse
 use rand::RngExt;
 
 pub async fn root_handler(session: Session) -> Redirect {
-    if session.get::<User>("user").await.unwrap_or(None).is_some() { Redirect::to("/chat") }
+    if session.get::<User>("userdata").await.unwrap_or(None).is_some() { Redirect::to("/chat") }
     else { Redirect::to("/login") }
+}
+
+pub async fn require_auth(
+    session: Session,
+    req: Request,
+    next: Next,
+) -> impl IntoResponse {
+    let ok = session
+        .get::<User>("userdata")
+        .await
+        .ok()
+        .flatten()
+        .is_some();
+
+    if !ok {
+        return Redirect::to("/login").into_response();
+    }
+
+    next.run(req).await
 }
 
 fn gen_guest_name() -> String {
     let mut rng = rand::rng();
     format!("Guest#{}", rng.random_range(1000..9999))
+}
+
+fn gen_acc_name() -> String {
+    let mut rng = rand::rng();
+    format!("User#{}", rng.random_range(1000..9999))
 }
 
 pub async fn login_guest(session: Session) -> Redirect {
@@ -24,7 +48,7 @@ pub async fn login_guest(session: Session) -> Redirect {
         authenticated: false
     };
 
-    session.insert("user", &user).await.unwrap();
+    session.insert("userdata", &user).await.unwrap();
     Redirect::to("/")
 }
 
@@ -38,7 +62,7 @@ pub async fn hc_auth_redirect(req: Request) -> Redirect {
     let scheme = if cfg!(debug_assertions) { "http" } else { "https" };
     let redirect_uri = format!("{scheme}://{host}/auth/hc/callback");
     let url = format!(
-        "https://auth.hackclub.com/oauth/authorize?client_id={}&redirect_uri={}&response_type=code&scope=openid+profile",
+        "https://auth.hackclub.com/oauth/authorize?client_id={}&redirect_uri={}&response_type=code&scope=openid+name+slack_id",
         dotenvy::var("HC_APP_ID").unwrap(),
         urlencoding::encode(&redirect_uri)
     );
@@ -104,21 +128,19 @@ pub async fn hc_callback(
         &decoding_key,
         &validation,
     ).map_err(|e| e.to_string())?;
-    println!("decoded claims: {:?}", claims.claims);
 
-    let first_name = claims.claims.given_name.unwrap_or("Unknown".to_string());
-
+    let id = format!("hc-{}", claims.claims.slack_id.unwrap_or_else(|| panic!("Failed to retrieve slack id during auth!")));
     let user = User {
-        id: uuid::Uuid::new_v4().to_string(),
-        name: first_name,
+        id: id,
+        name: gen_acc_name(),
         authenticated: true,
     };
+    
 
     session.set_expiry(Some(Expiry::AtDateTime(
         time::OffsetDateTime::now_utc() + Duration::days(30)
     )));
-    session.insert("user", user).await.unwrap();
-    println!("inserted user into session, redirecting");
+    session.insert("userdata", user).await.unwrap();
 
     Ok(Redirect::to("/"))
 }

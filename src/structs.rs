@@ -15,6 +15,16 @@ pub struct ReceivedData {
     pub date: i64
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UsernameResponse {
+    pub username: String
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UsernameRequest {
+    pub username: String
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct User {
     pub id: String,
@@ -55,5 +65,12 @@ pub struct HcClaims {
     pub name: Option<String>,
     pub given_name: Option<String>,
     pub family_name: Option<String>,
-    pub email: Option<String>,
+    pub slack_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+pub enum ClientMessage {
+    Message(ReceivedData),
+    UsernameRequest(UsernameRequest),
 }

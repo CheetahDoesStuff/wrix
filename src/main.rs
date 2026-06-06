@@ -1,9 +1,11 @@
+use axum::middleware;
 use axum::{Router, routing::get};
 use tokio::sync::broadcast;
 use tower_http::services::{ServeFile};
 use tower_sessions::cookie::SameSite;
 use tower_sessions::{MemoryStore, SessionManagerLayer};
 
+use crate::auth::require_auth;
 use crate::{auth::{hc_auth_redirect, hc_callback, login_guest, root_handler}, structs::{AppData, Message}};
 
 pub mod ws;
@@ -27,16 +29,20 @@ async fn main() -> anyhow::Result<()> {
         .route("/auth/hc/callback", get(hc_callback))
         .route("/ws", get(ws::ws_upg))
         .route("/", get(root_handler))
-        .layer(session_layer)
         .with_state(app_state);
 
-    let page_router = Router::new()
+    let auth_router = Router::new()
         .nest_service("/chat", ServeFile::new("public/chat.html"))
+        .route_layer(middleware::from_fn(require_auth));
+
+    let page_router = Router::new()
+        .merge(auth_router)
         .nest_service("/login", ServeFile::new("public/login.html"));
 
     let app = Router::new()
         .merge(api_router)
-        .merge(page_router);
+        .merge(page_router)
+        .layer(session_layer);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await?;
     axum::serve(listener, app).await?;
