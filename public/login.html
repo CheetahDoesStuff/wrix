@@ -3,10 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
     <title>Document</title>
 </head>
-<body>
-    <a href="/auth/guest">Login as guest</a>
-    <a href="/auth/hc">Login with HackClub</a>
+<body class="bg-zinc-950 flex items-center justify-center w-screen h-screen">
+    <div class="bg-zinc-900 border border-zinc-800 w-[320px] p-[20px] flex flex-col items-center rounded-2xl">
+        <p class="text-fuchsia-300 tracking-[0.4em] text-lg">Wrix_</p>
+        <div>
+            <a href="/auth/guest" class="text-sm block text-zinc-300 border border-zinc-800 bg-[#1f1f22] p-[6px] text-center rounded-xl mt-[16px] w-[240px] duration-450 transition-all hover:border-fuchsia-300 hover:text-fuchsia-300 hover:bg-zinc-800">Login as guest</a>
+            <a href="/auth/hc" class="text-sm block text-zinc-300 border border-zinc-800 bg-[#1f1f22] p-[6px] text-center rounded-xl mt-[12px] w-[240px] duration-450 transition-all hover:border-fuchsia-300 hover:text-fuchsia-300 hover:bg-zinc-800">Login with HackClub</a>
+        </div>
+    </div>
 </body>
 </html>

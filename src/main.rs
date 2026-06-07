@@ -8,7 +8,7 @@ use tower_http::services::{ServeFile};
 use tower_sessions::cookie::SameSite;
 use tower_sessions::{MemoryStore, SessionManagerLayer};
 
-use crate::auth::require_auth;
+use crate::auth::{logout, require_auth};
 use crate::{auth::{hc_auth_redirect, hc_callback, login_guest, root_handler}, structs::{AppData, Message}};
 
 pub mod ws;
@@ -29,6 +29,7 @@ async fn main() -> anyhow::Result<()> {
         .with_same_site(SameSite::Lax);
 
     let api_router = Router::new()
+        .route("/auth/logout", get(logout))
         .route("/auth/guest", get(login_guest))
         .route("/auth/hc", get(hc_auth_redirect))
         .route("/auth/hc/callback", get(hc_callback))
@@ -42,7 +43,8 @@ async fn main() -> anyhow::Result<()> {
 
     let page_router = Router::new()
         .merge(auth_router)
-        .nest_service("/login", ServeFile::new("public/login.html"));
+        .nest_service("/login", ServeFile::new("public/login.html"))
+        .nest_service("/style.css", ServeFile::new("public/style.css"));
 
     let app = Router::new()
         .merge(api_router)

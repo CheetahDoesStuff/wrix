@@ -3,18 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css" integrity="sha512-..." crossorigin="anonymous" referrerpolicy="no-referrer" />
     <title>Wrix</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:wght@300;400;500&display=swap');
+        :root {
+        --font-mono: 'DM Mono', monospace;
+        --font-sans: 'DM Sans', sans-serif;
+        }
+        body {
+            font-family: var(--font-mono);
+            font-variant: small-caps !important;
+            font-size: 0.85rem;
+        }
+    </style>
 </head>
-<body>
-    <form id="name-form">
-        <input type="text" id="name-input" placeholder="Username" required autocomplete="off" disabled/>
-        <button type="submit">Set</button>
+<body class="bg-zinc-950 text-zinc-600 flex flex-col h-screen max-h-screen">
+    <div class="flex p-[12px] pt-[6px] pb-[6px] border-b border-zinc-800 bg-zinc-900 items-center">
+        <p class="text-fuchsia-300 tracking-[0.4em] text-lg">Wrix_</p>
+        <div class="grow"></div>
+        <form  class="flex items-center" id="name-form">
+            <p id="username-text">Login to change your username!</p>
+            <input class="border border-zinc-800 rounded-md bg-[#1f1f22] m-[2px] pr-[4px] pl-[4px] outline-none text-zinc-300 duration-450 transition-all hover:enabled:border-fuchsia-300 focus:enabled:border-fuchsia-300 hover:enabled:text-fuchsia-300 focus:enabled:text-fuchsia-300 hover:enabled:bg-zinc-800 focus:bg-zinc-800 disabled:transition-none disabled:text-zinc-500" type="text" id="name-input" placeholder="Username" required autocomplete="off"/>
+            <button id="name-set" class="border border-zinc-800 rounded-md p-[1px] pr-[4px] pl-[4px] m-[2px] duration-450 transition-all hover:enabled:border-fuchsia-300 hover:enabled:text-fuchsia-300 hover:enabled:bg-zinc-800 disabled:transition-none" type="submit">✓ Set</button>
+            <div class="w-[1px] bg-zinc-800 ml-[10px] mr-[10px] h-[24px]"></div>
+            <button onclick="window.location.href='/auth/logout'" class="border border-zinc-800 rounded-md p-[1px] pr-[4px] pl-[4px] m-[2px] ml-[2px] duration-450 transition-all hover:border-fuchsia-300 hover:text-fuchsia-300 hover:bg-zinc-800" type="button"><i class="fa-solid fa-arrow-right-from-bracket"></i> Logout</button>
+        </form>
+    </div>
+    <div id="messages" class="p-[12px] pl-[16px] grow text-zinc-200 overflow-scroll">
+    </div>
+    <form id="chat-form" class="flex p-[12px] pt-[6px] pb-[6px] border-t border-zinc-800 bg-zinc-900 items-top">
+        <input class="border border-zinc-800 rounded-md bg-[#1f1f22] mt-[2px] mb-[4px] pr-[4px] pl-[4px] outline-none text-zinc-300 w-full duration-450 transition-all hover:border-fuchsia-300 focus:border-fuchsia-300 hover:text-fuchsia-300 focus:text-fuchsia-300 hover:bg-zinc-800 focus:bg-zinc-800" type="text" id="message-input" placeholder="Message" required autocomplete="off" />
+        <button class="border border-zinc-800 rounded-md p-[1px] pr-[6px] pl-[4px] m-[2px] ml-[4px] duration-450 transition-all hover:border-fuchsia-300 hover:text-fuchsia-300 hover:bg-zinc-800 h-[25px]" type="submit"><i class="fa-solid fa-paper-plane"></i></button>
     </form>
-    <div id="messages"></div>
-    <form id="chat-form">
-        <input type="text" id="message-input" placeholder="Type your message here..." required autocomplete="off" />
-        <button type="submit">Send</button>
-    </form>
+
+
+
+
     <script>
         const chatForm = document.getElementById('chat-form');
         const messageInput = document.getElementById('message-input');
@@ -22,9 +48,16 @@
 
         const nameForm = document.getElementById("name-form");
         const nameInput = document.getElementById("name-input");
+        const nameBtn = document.getElementById("name-set");
+        const nameText = document.getElementById("username-text");
 
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
         const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+        let ownerColors = {}
+        let colorOptions = ["#ed6aff", "#c27aff", "#7c86ff", "#8ec5ff", "#74d4ff", "#00d5be", "#5ee9b5", "#ffdf20", "#ffa2a2"]
+
+        messages.scrollTop = messages.scrollHeight;
 
         function send_message(text) {
             const payload = {
@@ -43,20 +76,40 @@
             try {
                 const incomingData = JSON.parse(event.data);
                 if ("message" in incomingData && "owner" in incomingData) {
+                    let atBottom = messages.scrollHeight - messages.scrollTop <= messages.clientHeight + 1;
                     messageElement = document.createElement("p");
-                    if (incomingData.owner == "SERVER_MESSAGE" && incomingData.date == 0) {
+                    if (incomingData.owner == "SERVER_MESSAGE") {
                         messageElement.textContent = `${incomingData.message}`
+                        messageElement.style.color = "#71717a";
+                        messageElement.style.fontStyle = "italic";
                         messages.appendChild(messageElement);
                     } else {
-                        const timeString = new Date(incomingData.date).toLocaleTimeString();
-                        messageElement.textContent = `[ ${timeString} ] ${incomingData.owner}:  ${incomingData.message}`;
+                        const messageElement = document.createElement("p");
+
+                        const timeSpan = document.createElement("span");
+                        timeSpan.textContent = new Date(incomingData.date).toLocaleTimeString() + " ";
+                        timeSpan.style.color = "#71717a";
+
+                        const ownerSpan = document.createElement("span");
+                        ownerSpan.textContent = incomingData.owner + ": ";
+                        if (!(incomingData.owner in ownerColors)) { ownerColors[incomingData.owner] = colorOptions[Math.floor(Math.random() * colorOptions.length)] }
+                        ownerSpan.style.color = ownerColors[incomingData.owner];
+
+                        const contentSpan = document.createElement("span");
+                        contentSpan.textContent = incomingData.message;
+
+                        messageElement.appendChild(timeSpan);
+                        messageElement.appendChild(ownerSpan);
+                        messageElement.appendChild(contentSpan);
+
                         messages.appendChild(messageElement);
                     }
+                    if (atBottom) { messages.scrollTop = messages.scrollHeight; }
             
                 } else if ("username" in incomingData) {
                     nameInput.value = incomingData.username
-                    if (incomingData.authenticated) { nameInput.disabled = false; nameInput.title = "You must log in to change your unsername!"; }
-                    else { nameInput.disabled = true; }
+                    if (incomingData.authenticated) { nameInput.disabled = false; nameBtn.disabled = false; nameText.textContent = ""; }
+                    else { nameInput.disabled = true; nameBtn.disabled = true; nameText.textContent = "Login to change your username!"; }
                 } else {
                     console.warn("Unknown packet recieved!");
                 }

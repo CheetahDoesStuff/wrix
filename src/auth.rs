@@ -31,6 +31,11 @@ pub async fn require_auth(
     next.run(req).await
 }
 
+pub async fn logout(session: Session) -> Redirect {
+    let _ = session.remove::<User>("userdata").await;
+    Redirect::to("/")
+}
+
 fn gen_guest_name() -> String {
     let mut rng = rand::rng();
     format!("Guest#{}", rng.random_range(1000..9999))

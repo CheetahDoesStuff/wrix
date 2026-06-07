@@ -1,3 +1,5 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use axum::{extract::{State, WebSocketUpgrade, ws::WebSocket}, response::IntoResponse};
 use axum::extract::ws::Message as WsMessage;
 use futures::StreamExt;
@@ -53,7 +55,7 @@ async fn handle_socket(socket: WebSocket, state: AppData, session: Session) {
             "SELECT owner, date, content
             FROM messages
             ORDER BY date DESC
-            LIMIT 50"
+            LIMIT 200"
         ).unwrap();
 
         let rows = stmt.query_map([], |row| {
@@ -68,7 +70,9 @@ async fn handle_socket(socket: WebSocket, state: AppData, session: Session) {
     };
     messages.reverse();
     for message in messages {
-        let _ = state.tx.send(message);
+        if let Ok(json) = serde_json::to_string(&message) {
+            let _ = local_tx.send(WsMessage::Text(json.into())).await;
+        } 
     }
 
     while let Some(Ok(msg)) = stream.next().await {
@@ -87,24 +91,29 @@ async fn handle_socket(socket: WebSocket, state: AppData, session: Session) {
                 Ok(ClientMessage::UsernameRequest(request)) => {
                     if user.authenticated == true {
                         if request.username == "SERVER_MESSAGE" { continue; }
-                        let old_name = user.name;
+                        let old_name = user.name.clone();
+                        if old_name == request.username {continue;}
                         user.name = request.username;
                         session.set_expiry(Some(Expiry::AtDateTime(
                             time::OffsetDateTime::now_utc() + Duration::days(30)
                         )));
                         session.insert("userdata", &user).await.unwrap();
+                        session.save().await.unwrap();
                         
                         let response = UsernameResponse { username: user.name.clone(), authenticated: user.authenticated };
                         if let Ok(json) = serde_json::to_string(&response) {
                             let _ = local_tx.send(WsMessage::Text(json.into())).await;
                         }
 
+                        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards, more than 50 years??").as_millis();
+                        
+                        let message = format!("User '{}' changed their username to '{}'", old_name, user.name);
                         let _ = state.tx.send(Message {
                             owner: "SERVER_MESSAGE".to_string(),
-                            message: format!("User '{}' changed their username to '{}'", old_name, user.name),
-                            date: 0
+                            message: message.clone(),
+                            date: timestamp as i64
                         });
-
+                        let _ = state.conn.lock().unwrap().execute("INSERT INTO messages (owner, date, content) VALUES (?1, ?2, ?3)", ("SERVER_MESSAGE".to_string(), timestamp as i64, message));
                         let _ = state.conn.lock().unwrap().execute("UPDATE users SET username = ?1 WHERE id = ?2", (user.name.clone(), user.id.clone()));
                     } else {
                         let response = UsernameResponse { username: user.name.clone(), authenticated: user.authenticated };
