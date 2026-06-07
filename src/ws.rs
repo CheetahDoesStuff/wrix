@@ -29,6 +29,7 @@ async fn handle_socket(socket: WebSocket, state: AppData, session: Session) {
     let mut rx = state.tx.subscribe();
     let (local_tx, mut local_rx) = mpsc::channel::<WsMessage>(32);
 
+    
     tokio::spawn(async move {
         loop {
             tokio::select! {
@@ -47,6 +48,14 @@ async fn handle_socket(socket: WebSocket, state: AppData, session: Session) {
     if let Ok(json) = serde_json::to_string(&username_information) {
         let _ = local_tx.send(WsMessage::Text(json.into())).await;
     }   
+
+    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards, more than 50 years??").as_millis();
+    let _ = state.tx.send(Message {
+        owner: "SERVER_MESSAGE".to_string(),
+        message: format!("User '{}' joined the chat!", user.name),
+        date: timestamp as i64,
+    });
+    let _ = state.conn.lock().unwrap().execute("INSERT INTO messages (owner, date, content) VALUES (?1, ?2, ?3)", ("SERVER_MESSAGE", timestamp as i64, format!("User '{}' joined the chat!", user.name)));
 
     let mut messages = {
         let conn = state.conn.lock().unwrap();
@@ -106,7 +115,6 @@ async fn handle_socket(socket: WebSocket, state: AppData, session: Session) {
                         }
 
                         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards, more than 50 years??").as_millis();
-                        
                         let message = format!("User '{}' changed their username to '{}'", old_name, user.name);
                         let _ = state.tx.send(Message {
                             owner: "SERVER_MESSAGE".to_string(),
@@ -129,4 +137,12 @@ async fn handle_socket(socket: WebSocket, state: AppData, session: Session) {
             }
         }
     }
+
+    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards, more than 50 years??").as_millis();
+    let _ = state.tx.send(Message {
+        owner: "SERVER_MESSAGE".to_string(),
+        message: format!("User '{}' left the chat.", user.name),
+        date: timestamp as i64,
+    });
+    let _ = state.conn.lock().unwrap().execute("INSERT INTO messages (owner, date, content) VALUES (?1, ?2, ?3)", ("SERVER_MESSAGE", timestamp as i64, format!("User '{}' left the chat.", user.name)));
 }
