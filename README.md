@@ -18,8 +18,17 @@ The app features the basic stuff:
 The app is hosted and availble publicly at https://wrix.ch0.dev/.  
 
 ### Selfhosting
-Because of the way that the app is written, a lot of details are hardcoded. To selfhost this yourself i would recommend following this:
-- Create an auth app at auth.hackclub.com
+Note: This requires you to have rustup and git installed.
+
+Because of the way that the app is written, some setup is required to selfhost it. To selfhost this yourself i would recommend following this:
+- Create an auth app at auth.hackclub.com, note down the ID and secret of your app. Note that the redirect URL must equal `http(s)://yourdomain.wow/auth/hc/callback`, where `yourdomain.wow` is the exact host you are accessing the app from, for example if you are hosting locally, that would be http://localhost:8080. THe app should have the scopes slack_id, name and openid for the app to work.
+- Git clone the repo and create a .env file containing the following variables:
+  ```env
+  HC_APP_ID = your app id
+  HC_APP_SECRET = your app secret
+  ```
+- You can then run it using `cargo run --release` and giving it some time to compile.
+- It should now be accessible at http://localhost:8080!
 
 
 ## Tech Stack
