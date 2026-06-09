@@ -16,7 +16,11 @@ The app features the basic stuff:
 
 ## Usage
 The app is hosted and availble publicly at https://wrix.ch0.dev/.  
-Note: You CAN selfhost, but a lot of stuff is hardcoded in the codebase, making it basically impossible to selfhost without changing the code yourself, and since its not made to be hosted by others i am not going to cover it.
+
+### Selfhosting
+Because of the way that the app is written, a lot of details are hardcoded. To selfhost this yourself i would recommend following this:
+- Create an auth app at auth.hackclub.com
+
 
 ## Tech Stack
 - Rust
