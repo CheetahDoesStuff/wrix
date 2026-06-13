@@ -78,7 +78,7 @@ pub async fn hc_auth_redirect(req: Request) -> Redirect {
 
 #[axum::debug_handler]
 pub async fn hc_callback(
-    State(state): State<AppData>, Query(params): Query<HcCallbackParams>, session: Session
+    State(state): State<AppData>, Query(params): Query<HcCallbackParams>, session: Session, req: Request
 ) -> Result<Redirect, String> {
     let code = params.code;
     println!("got code: {}", code);
@@ -112,10 +112,16 @@ pub async fn hc_callback(
         .map_err(|e| e.to_string())?;
     println!("token request status: {}", res.status());
 
-    let res = res.error_for_status().map_err(|e| e.to_string())?;
-    println!("status ok");
+    let status = res.status();
+    let body = res.text().await.map_err(|e| e.to_string())?;
+    println!("HC token status: {}", status);
+    println!("HC token body: {}", body);
 
-    let token: HcTokenResponse = res.json().await.map_err(|e| e.to_string())?;
+    if !status.is_success() {
+        return Err(format!("{}: {}", status, body));
+    }
+
+    let token: HcTokenResponse = serde_json::from_str(&body).map_err(|e| e.to_string())?;
     println!("got token: {:?}", token);
 
     let jwks: serde_json::Value = Client::new()
