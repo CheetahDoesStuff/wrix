@@ -89,12 +89,21 @@ pub async fn hc_callback(
 
     let client = Client::new();
 
+    let host = req
+        .headers()
+        .get("host")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("localhost:8080");
+
+    let scheme = if cfg!(debug_assertions) { "http" } else { "https" };
+    let redirect_uri = format!("{scheme}://{host}/auth/hc/callback");
+
     let res = client
         .post("https://auth.hackclub.com/oauth/token")
         .json(&HcTokenRequest {
             client_id: &client_id,
             client_secret: &client_secret,
-            redirect_uri: "http://localhost:8080/auth/hc/callback",
+            redirect_uri: &redirect_uri,
             code: &code,
             grant_type: "authorization_code",
         })
